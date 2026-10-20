@@ -60,11 +60,11 @@ O build é criado em `dist/`; o comando de preview informa o endereço local ond
 
 #### Instalar no Ubuntu
 
-Instale o Docker Engine e o Docker Compose disponibilizados pelos repositórios do Ubuntu:
+Instale o Docker Engine e o plugin Docker Compose V2 disponibilizados pelos repositórios do Ubuntu:
 
 ```bash
 sudo apt-get update
-sudo apt-get install docker.io docker-compose
+sudo apt-get install docker.io docker-compose-v2
 ```
 
 Habilite e inicie o serviço do Docker:
@@ -77,7 +77,7 @@ Verifique a instalação. Os comandos Docker abaixo usam `sudo` para acessar o d
 
 ```bash
 sudo docker --version
-sudo docker-compose --version
+sudo docker compose version
 sudo docker run hello-world
 ```
 
@@ -89,22 +89,29 @@ Na raiz do repositório, crie `.env` a partir do exemplo `.env.example` somente 
 [ -f .env ] || cp .env.example .env
 ```
 
-Configure `VITE_API_URL` no `.env` com a URL raiz do backend, sem acrescentar `/gestor`. Para um backend local, use `http://host.docker.internal:8000`; para produção, o padrão é `https://biblio-webapi.onrender.com`.
+Configure `VITE_API_URL` no `.env` com a URL raiz do backend, sem acrescentar `/gestor`. Para produção, o padrão é `https://biblio-webapi.onrender.com`.
 
 Construa e inicie o frontend:
 
 ```bash
-sudo docker-compose up --build -d
+sudo docker compose up --build -d
 sudo docker ps
 ```
 
-O servidor de desenvolvimento do Vite ficará disponível em `http://localhost:5173`. O arquivo `.env` e a pasta `src/` são montados diretamente do host; alterações em `src/` são refletidas pelo Vite. O backend é executado separadamente. Em Linux, para acessar o backend no host pelo endereço `host.docker.internal`, adicione `extra_hosts: ["host.docker.internal:host-gateway"]` ao serviço `frontend` no `docker-compose.yml`.
+Para só iniciar o frontend
+
+```bash
+sudo docker compose up -d
+sudo docker ps
+```
+
+O servidor de desenvolvimento do Vite ficará disponível em `http://localhost:5173`. O arquivo `.env` e a pasta `src/` são montados diretamente do host; alterações em `src/` são refletidas pelo Vite. O backend é executado separadamente. O alias `biblioteca-host` resolve, de dentro do container, para o gateway da máquina host. Use `http://biblioteca-host:<porta>` para alcançar um serviço do host na porta em que ele estiver ouvindo; o Compose não publica nem libera portas automaticamente. As chamadas feitas pelo navegador do usuário precisam usar um hostname acessível pelo próprio navegador.
 
 Para acompanhar os logs ou encerrar os containers:
 
 ```bash
-sudo docker-compose logs -f frontend
-sudo docker-compose down
+sudo docker compose logs -f frontend
+sudo docker compose down
 ```
 
 ### Login
