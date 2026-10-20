@@ -56,6 +56,64 @@ npm run preview
 
 O build é criado em `dist/`; o comando de preview informa o endereço local onde ele está sendo servido.
 
+### Docker
+
+#### Instalar no Ubuntu
+
+Os comandos abaixo instalam o Docker Engine e o plugin oficial Docker Compose V2. O plugin é usado como `docker compose` (com espaço).
+
+```bash
+sudo apt-get update
+sudo apt-get install ca-certificates curl
+sudo install -m 0755 -d /etc/apt/keyrings
+sudo curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
+sudo chmod a+r /etc/apt/keyrings/docker.asc
+echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu $(. /etc/os-release && echo "${UBUNTU_CODENAME:-$VERSION_CODENAME}") stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+sudo apt-get update
+sudo apt-get install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+```
+
+Habilite o serviço e permita que seu usuário execute Docker sem `sudo`:
+
+```bash
+sudo systemctl enable --now docker
+sudo usermod -aG docker "$USER"
+```
+
+Encerre e reabra a sessão do sistema ou do VS Code para aplicar o novo grupo. O grupo `docker` concede privilégios equivalentes aos de root. Verifique a instalação:
+
+```bash
+docker --version
+docker compose version
+docker run hello-world
+```
+
+#### Iniciar o projeto
+
+Na raiz do repositório, crie `.env` a partir do exemplo `.env.example` somente se ainda não existir:
+
+```bash
+[ -f .env ] || cp .env.example .env
+```
+
+Configure `VITE_API_URL` no `.env` com a URL raiz do backend, sem acrescentar `/gestor`. Para um backend local, use `http://host.docker.internal:8000`; para produção, o padrão é `https://biblio-webapi.onrender.com`.
+
+Construa e inicie o frontend:
+
+```bash
+docker compose up --build -d
+docker compose ps
+```
+
+O servidor de desenvolvimento do Vite ficará disponível em `http://localhost:5173`. O arquivo `.env` e a pasta `src/` são montados diretamente do host; alterações em `src/` são refletidas pelo Vite. O backend é executado separadamente. Em Linux, para acessar o backend no host pelo endereço `host.docker.internal`, adicione `extra_hosts: ["host.docker.internal:host-gateway"]` ao serviço `frontend` no `docker-compose.yml`.
+
+Para acompanhar os logs ou encerrar os containers:
+
+```bash
+docker compose logs -f frontend
+docker compose down
+```
+
 ### Login
 
 No estado atual, o login é temporário e aceita qualquer usuário e senha; ele não valida credenciais no backend. Não considere esse comportamento uma proteção de acesso para produção.
