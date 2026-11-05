@@ -50,6 +50,28 @@ export class GestorController {
     }
   }
 
+  async showDashboard() {
+    this.view = this.view || new GestorView();
+    this.view.showLoading("Carregando indicadores...");
+
+    try {
+      const [operacional, territorio] = await Promise.all([
+        this.service.obterAnalyticsResumo(),
+        this.service.obterAnalyticsTerritorio(),
+      ]);
+
+      this.view.renderDashboard({
+        operacional: operacional || {},
+        territorio: territorio || {},
+      });
+    } catch (err) {
+      console.error("Erro ao carregar dashboard:", err);
+      this.view.hideLoading();
+      showToast("Não foi possível carregar os indicadores agora.", "error");
+      throw err;
+    }
+  }
+
   /* ───────────────────────────────
    * LIVROS — CRUD
    * ─────────────────────────────── */
@@ -121,10 +143,8 @@ export class GestorController {
     const onDelete =
       callbacks.onDelete ||
       (async (livroId) => {
-        if (confirm("Deseja realmente remover este livro?")) {
-          await this.removerLivro(livroId);
-          await this.showLivrosPage(callbacks);
-        }
+        await this.removerLivro(livroId);
+        await this.showLivrosPage(callbacks);
       });
 
     const onView = callbacks.onView || ((livroId) => this.showLivroDetalhe(livroId));
@@ -273,6 +293,14 @@ export class GestorController {
 
   async showLivroDetalhe(id) {
     try {
+      if (
+        !this.initData.generos.length ||
+        !this.initData.unidades.length ||
+        !this.initData.tipo_obras.length
+      ) {
+        await this.fetchInitData();
+      }
+
       const livro = await this.service.getLivroById(id);
       this.view = this.view || new GestorView();
       this.view.renderLivroDetalhe(livro, this.initData);
@@ -315,10 +343,8 @@ export class GestorController {
     const onDelete =
       callbacks.onDelete ||
       (async (id) => {
-        if (confirm("Deseja realmente remover esta unidade?")) {
-          await this.service.removerUnidade(id);
-          await this.showUnidadesPage(callbacks);
-        }
+        await this.service.removerUnidade(id);
+        await this.showUnidadesPage(callbacks);
       });
 
     const onView = callbacks.onView || ((id) => this.showUnidadeDetalhe(id));
@@ -328,6 +354,18 @@ export class GestorController {
 
   async showUnidadeForm(id, onBack = null) {
     const unidade = id ? await this.service.getUnidadeById(id) : null;
+
+    let bairros = [];
+    try {
+      const territorio = await this.service.obterAnalyticsTerritorio();
+      bairros = Array.isArray(territorio?.bairros) ? territorio.bairros : [];
+    } catch (err) {
+      console.error("Erro ao carregar bairros IBGE:", err);
+      showToast(
+        "Não foi possível carregar os bairros do IBGE. O cadastro pode continuar sem vínculo territorial.",
+        "warning"
+      );
+    }
 
     this.view = this.view || new GestorView();
     this.view.renderUnidadeForm(
@@ -347,7 +385,8 @@ export class GestorController {
         }
       },
       unidade,
-      onBack || (() => navigate("/unidades"))
+      onBack || (() => navigate("/unidades")),
+      bairros
     );
   }
 
@@ -411,9 +450,7 @@ export class GestorController {
     const onDelete =
       callbacks.onDelete ||
       (async (id) => {
-        if (confirm("Deseja realmente remover este usuário?")) {
-          await this.deleteUsuario(id);
-        }
+        await this.deleteUsuario(id);
       });
 
     const onFilter =
@@ -526,6 +563,69 @@ export class GestorController {
     this.view.renderEmprestimosPage(emprestimos, onAdd, onEdit, onDelete, onFilter);
   }
 
+  async showAcessosPage() {
+    this.view = this.view || new GestorView();
+    this.view.showLoading("Carregando acessos...");
+
+    const root = document.querySelector("#app-content");
+    if (!root) {
+      this.view.hideLoading();
+      return;
+    }
+
+    root.innerHTML = `<acesso-page></acesso-page>`;
+    const page = root.querySelector("acesso-page");
+
+    const refresh = async () => {
+      const response = await this.service.listarAcessos();
+      page.accounts = Array.isArray(response) ? response : [];
+    };
+
+    page.onCreate = async (payload) => {
+      try {
+        await this.service.adicionarAcesso(payload);
+        await refresh();
+      } catch (err) {
+        throw new Error(
+          extractFriendlyError(err, "Não foi possível criar o acesso.")
+        );
+      }
+    };
+
+    page.onUpdate = async (id, payload) => {
+      try {
+        await this.service.atualizarAcesso(id, payload);
+        await refresh();
+      } catch (err) {
+        throw new Error(
+          extractFriendlyError(err, "Não foi possível atualizar o acesso.")
+        );
+      }
+    };
+
+    page.onResetPassword = async (id, password) => {
+      try {
+        await this.service.redefinirSenhaAcesso(id, password);
+      } catch (err) {
+        throw new Error(
+          extractFriendlyError(err, "Não foi possível redefinir a senha.")
+        );
+      }
+    };
+
+    try {
+      await refresh();
+    } catch (err) {
+      console.error("Erro ao carregar acessos:", err);
+      showToast(
+        extractFriendlyError(err, "Não foi possível carregar os acessos."),
+        "error"
+      );
+    } finally {
+      this.view.hideLoading();
+    }
+  }
+
   async showEmprestimoForm(id, onBack = null, options = {}) {
     let emprestimo = null;
     if (id) {
@@ -542,7 +642,7 @@ export class GestorController {
     try {
       const [livrosResp, usuariosResp, unidadesResp] = await Promise.all([
         this.service.listarLivros(),
-        this.service.listarUsuarios(),
+        id ? this.service.listarUsuarios() : this.service.listarUsuarios({ ativo: true }),
         this.service.listarUnidades(),
       ]);
       livros = Array.isArray(livrosResp) ? livrosResp : [];

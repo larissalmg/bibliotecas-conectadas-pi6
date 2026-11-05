@@ -1,4 +1,7 @@
 import "./livro-form.css";
+import "../isbn/isbn-scanner.js";
+import { escapeHtml } from "../../utils/html.js";
+import { normalizeIsbn } from "../../utils/isbn.js";
 
 // Web Component para o formulário de livro
 class LivroForm extends HTMLElement {
@@ -41,17 +44,26 @@ class LivroForm extends HTMLElement {
                 <div>
                     <label for="isbn">ISBN:</label>
                     <div class="isbn-input-wrapper" data-loading="false">
-                      <input type="text" id="isbn" name="isbn" maxlength="13" inputmode="numeric" pattern="(?:\d{10}|\d{13}|\d{9}[\dXx])">
+                      <input type="text" id="isbn" name="isbn" maxlength="13" inputmode="numeric" pattern="(?:[0-9]{10}|[0-9]{13}|[0-9]{9}[0-9Xx])">
                       <button
                         type="button"
                         id="isbn-lookup-trigger"
                         class="isbn-lookup-trigger"
-                        aria-label="Buscar dados do ISBN ao sair do campo"
-                        title="Clique para buscar (ou saia do campo ISBN)">
+                        aria-label="Buscar dados pelo ISBN"
+                        title="Buscar dados pelo ISBN">
                         <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
+                      </button>
+                      <button
+                        type="button"
+                        id="isbn-scan-trigger"
+                        class="isbn-scan-trigger"
+                        aria-label="Ler ISBN pela câmera"
+                        title="Ler ISBN pela câmera">
+                        <i class="fa-solid fa-barcode" aria-hidden="true"></i>
                       </button>
                     </div>
                   <small id="isbn-feedback" class="isbn-feedback" aria-live="polite"></small>
+                  <small class="isbn-help">Digite o ISBN, use um scanner físico/USB ou leia o código pela câmera.</small>
                 </div>
                 <div>
                     <label for="titulo">Título:</label>
@@ -90,7 +102,7 @@ class LivroForm extends HTMLElement {
           <select id="tipo_obra" name="tipo_obra">
             <option value="">Selecione o tipo de obra</option>
             ${tipoObras
-            .map((t) => `<option value="${t.id}">${t.nome}</option>`)
+            .map((t) => `<option value="${t.id}">${escapeHtml(t.nome)}</option>`)
             .join("")}
           </select>
         </div>
@@ -100,7 +112,7 @@ class LivroForm extends HTMLElement {
                   <select id="unidade-select">
                     <option value="">Selecione a unidade</option>
                     ${unidades
-                      .map((u) => `<option value="${u.id}">${u.nome}</option>`)
+                      .map((u) => `<option value="${u.id}">${escapeHtml(u.nome)}</option>`)
                       .join("")}
                   </select>
                     </div>
@@ -115,6 +127,7 @@ class LivroForm extends HTMLElement {
                     <button type="button" id="cancelar-btn" class="outline">Cancelar</button>
                     <button type="submit">Salvar Livro</button>
                 </div>
+                <isbn-scanner id="isbn-camera-scanner"></isbn-scanner>
                 <div id="isbn-global-loading" class="isbn-global-loading" hidden>
                   <div class="isbn-global-loading-card">
                     <span class="isbn-global-loading-spinner" aria-hidden="true"></span>
@@ -143,6 +156,8 @@ class LivroForm extends HTMLElement {
       const form = this.querySelector("#livro-form");
       const isbnInput = this.querySelector("#isbn");
       const isbnLookupTrigger = this.querySelector("#isbn-lookup-trigger");
+      const isbnScanTrigger = this.querySelector("#isbn-scan-trigger");
+      const isbnScanner = this.querySelector("#isbn-camera-scanner");
       const isbnInputWrapper = this.querySelector(".isbn-input-wrapper");
       const isbnFeedback = this.querySelector("#isbn-feedback");
       const formFeedback = this.querySelector("#livro-form-feedback");
@@ -251,8 +266,8 @@ class LivroForm extends HTMLElement {
         }
 
         const rawIsbn = String(isbnInput?.value || "").trim();
-        const isbn = rawIsbn.replace(/[^0-9Xx]/g, "");
-        const lookupKey = isbn.toUpperCase();
+        const isbn = normalizeIsbn(rawIsbn);
+        const lookupKey = isbn;
 
         if (isbn.length < 10) {
           setIsbnFeedback("");
@@ -320,7 +335,7 @@ class LivroForm extends HTMLElement {
           if (isbnDebounceTimer) clearTimeout(isbnDebounceTimer);
 
           const rawIsbn = String(isbnInput.value || "").trim();
-          const isbn = rawIsbn.replace(/[^0-9Xx]/g, "");
+          const isbn = normalizeIsbn(rawIsbn);
 
           if (!rawIsbn) {
             setIsbnFeedback("");
@@ -344,6 +359,15 @@ class LivroForm extends HTMLElement {
           if (isbnDebounceTimer) clearTimeout(isbnDebounceTimer);
           buscarPorIsbn("blur");
         });
+
+        // Scanners físicos/USB normalmente digitam o código e enviam Enter.
+        isbnInput.addEventListener("keydown", (event) => {
+          if (event.key !== "Enter") return;
+          event.preventDefault();
+          if (isbnDebounceTimer) clearTimeout(isbnDebounceTimer);
+          isbnInput.value = normalizeIsbn(isbnInput.value);
+          buscarPorIsbn("hardware-scanner");
+        });
       }
 
       if (isbnLookupTrigger && isbnInput) {
@@ -353,6 +377,27 @@ class LivroForm extends HTMLElement {
             return;
           }
           buscarPorIsbn("icon");
+        });
+      }
+
+      if (isbnScanTrigger && isbnScanner && isbnInput) {
+        isbnScanTrigger.addEventListener("click", () => isbnScanner.open());
+
+        isbnScanner.addEventListener("isbn-scan", async (event) => {
+          const isbn = normalizeIsbn(event.detail?.isbn || "");
+          if (!isbn) return;
+
+          isbnInput.value = isbn;
+          lastLookupKey = "";
+          setIsbnFeedback("ISBN lido pela câmera. Buscando dados do livro...", "loading");
+          await buscarPorIsbn("camera-scanner");
+        });
+
+        isbnScanner.addEventListener("isbn-scan-error", (event) => {
+          setIsbnFeedback(
+            event.detail?.message || "Não foi possível usar a câmera para ler o ISBN.",
+            "error"
+          );
         });
       }
 
@@ -373,7 +418,7 @@ class LivroForm extends HTMLElement {
               this._livroUnidades
                 .map(
                   (u) =>
-                    `<li><strong>${u.unidade.nome}:</strong> ${u.exemplares} exemplar(es) <button type='button' class='remove-unidade-livro outline' data-id='${u.unidade.id}'>Remover</button></li>`
+                    `<li><strong>${escapeHtml(u.unidade.nome)}:</strong> ${u.exemplares} exemplar(es) <button type='button' class='remove-unidade-livro outline' data-id='${u.unidade.id}'>Remover</button></li>`
                 )
                 .join("") +
               `</ul>`
@@ -447,19 +492,15 @@ class LivroForm extends HTMLElement {
           formFeedback.textContent = "";
           formFeedback.classList.remove("is-error", "is-success", "is-loading");
         }
-        // Adiciona as unidades selecionadas ao form para o controller
-        if (form._livroUnidades && form._livroUnidades.length > 0) {
-          form._unidadesPayload = form._livroUnidades.map((u) => ({
-            unidade: u.unidade.id,
-            exemplares: u.exemplares,
-          }));
-        } else {
-          form._unidadesPayload = [
-            { unidade: unidades[0]?.id || 1, exemplares: 1 },
-          ];
-        }
-        // Tipo de obra selecionado
-        form._tipoObraValue = form.querySelector('[name="tipo_obra"]')?.value || null;
+        // Mantém no próprio Web Component o estado que será enviado pelo GestorView.
+        // Antes este trecho gravava no <form> interno, mas o submit externo lia o
+        // estado do <livro-form>, fazendo as alterações de unidades/exemplares se perderem.
+        this._unidadesPayload = (this._livroUnidades || []).map((u) => ({
+          unidade: u.unidade.id,
+          exemplares: Number(u.exemplares) || 0,
+        }));
+        this._tipoObraValue =
+          form.querySelector('[name="tipo_obra"]')?.value || null;
       });
       // Preencher campos do formulário ao editar
       if (isEdit && this._livroSelecionado) {

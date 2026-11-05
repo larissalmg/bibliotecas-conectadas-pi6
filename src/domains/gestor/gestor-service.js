@@ -2,10 +2,41 @@
 // Lógica de negócio relacionada ao gestor
 import { Livro, Unidade, Usuario, Emprestimo } from "./gestor-model.js";
 import { BaseService } from "../base-service.js";
+import { normalizeIsbn } from "../../utils/isbn.js";
 
 export class GestorService extends BaseService {
   constructor() {
     super();
+  }
+
+  async obterAnalyticsResumo() {
+    return this.get("gestor/analytics/resumo/");
+  }
+
+  async obterAnalyticsTerritorio(filters = {}) {
+    const query = new URLSearchParams();
+    if (filters.codigo) query.set("codigo", String(filters.codigo));
+    if (filters.bairro) query.set("bairro", String(filters.bairro));
+
+    const suffix = query.toString() ? `?${query.toString()}` : "";
+    return this.get(`gestor/analytics/territorio/${suffix}`);
+  }
+
+  // Gestão de acessos à plataforma (administradores)
+  async listarAcessos() {
+    return this.get("gestor/acessos/");
+  }
+
+  async adicionarAcesso(payload) {
+    return this.post("gestor/acessos/", payload);
+  }
+
+  async atualizarAcesso(id, payload) {
+    return this.patch(`gestor/acessos/${id}/`, payload);
+  }
+
+  async redefinirSenhaAcesso(id, password) {
+    return this.post(`gestor/acessos/${id}/reset-password/`, { password });
   }
 
   // CRUD de Livros
@@ -34,17 +65,17 @@ export class GestorService extends BaseService {
     return this.get(url);
   }
 
- async lookupLivroPorIsbn(isbn) {
-  const normalized = String(isbn || "").replace(/\D/g, "");
+  async lookupLivroPorIsbn(isbn) {
+    const normalized = normalizeIsbn(isbn);
 
-  if (!normalized) {
-    throw new Error("Informe um ISBN para consulta.");
+    if (!normalized) {
+      throw new Error("Informe um ISBN para consulta.");
+    }
+
+    return this.get(
+      `gestor/livros/isbn-lookup/?isbn=${encodeURIComponent(normalized)}`
+    );
   }
-
-  return this.get(
-    `gestor/livros/isbn-lookup/?isbn=${encodeURIComponent(normalized)}`
-  );
-}
 
   getObjectWithPropId(nomePropriedade, livroData) {
     return {
@@ -91,14 +122,7 @@ export class GestorService extends BaseService {
   }
 
   async removerLivro(livroId) {
-    const response = await fetch(this.baseUrl + `gestor/livros/${livroId}/`, {
-      method: "DELETE",
-      headers: { "Content-Type": "application/json" },
-    });
-    if (!response.ok) {
-      const error = await response.text();
-      throw new Error(error || `Erro ${response.status}`);
-    }
+    await this.delete(`gestor/livros/${livroId}/`);
     return true;
   }
 
@@ -107,60 +131,36 @@ export class GestorService extends BaseService {
     return this.get("gestor/unidades/");
   }
 
-  adicionarUnidade(unidadeData) {
-    const newId =
-      this.unidades.length > 0
-        ? Math.max(...this.unidades.map((u) => u.id)) + 1
-        : 1;
-    const unidade = new Unidade({ ...unidadeData, id: newId });
-    this.unidades.push(unidade);
-    return unidade;
+  async adicionarUnidade(unidadeData) {
+    const payload = { ...unidadeData };
+    return this.post("gestor/unidades/", payload);
   }
 
-  atualizarUnidade(unidadeId, unidadeData) {
-    const index = this.unidades.findIndex((u) => u.id === unidadeId);
-    if (index !== -1) {
-      this.unidades[index] = {
-        ...this.unidades[index],
-        ...unidadeData,
-        id: unidadeId,
-      };
-      return this.unidades[index];
-    }
-    return null;
+  async atualizarUnidade(unidadeId, unidadeData) {
+    const payload = { ...unidadeData };
+    return this.put(`gestor/unidades/${unidadeId}/`, payload);
   }
 
-  removerUnidade(unidadeId) {
-    this.unidades = this.unidades.filter((u) => u.id !== unidadeId);
+  async removerUnidade(unidadeId) {
+    await this.delete(`gestor/unidades/${unidadeId}/`);
+    return true;
   }
 
   async getUnidadeById(id) {
     return this.get(`gestor/unidades/${id}/`);
   }
 
+  // Compatibilidade com chamadas antigas.
   async atualizarUnidadeApi(unidadeId, unidadeData) {
-    const payload = { ...unidadeData };
-    return this.put(`gestor/unidades/${unidadeId}/`, payload);
+    return this.atualizarUnidade(unidadeId, unidadeData);
   }
 
   async removerUnidadeApi(unidadeId) {
-    const response = await fetch(
-      this.baseUrl + `gestor/unidades/${unidadeId}/`,
-      {
-        method: "DELETE",
-        headers: { "Content-Type": "application/json" },
-      }
-    );
-    if (!response.ok) {
-      const error = await response.text();
-      throw new Error(error || `Erro ${response.status}`);
-    }
-    return true;
+    return this.removerUnidade(unidadeId);
   }
 
   async adicionarUnidadeApi(unidadeData) {
-    const payload = { ...unidadeData };
-    return this.post("gestor/unidades/", payload);
+    return this.adicionarUnidade(unidadeData);
   }
 
   // CRUD de Usuários
@@ -208,14 +208,7 @@ export class GestorService extends BaseService {
   }
 
   async removerUsuario(usuarioId) {
-    const response = await fetch(this.baseUrl + `gestor/usuarios/${usuarioId}/`, {
-      method: "DELETE",
-      headers: { "Content-Type": "application/json" },
-    });
-    if (!response.ok) {
-      const error = await response.text();
-      throw new Error(error || `Erro ${response.status}`);
-    }
+    await this.delete(`gestor/usuarios/${usuarioId}/`);
     return true;
   }
 
@@ -262,14 +255,7 @@ export class GestorService extends BaseService {
   }
 
   async removerEmprestimo(emprestimoId) {
-    const response = await fetch(this.baseUrl + `gestor/emprestimos/${emprestimoId}/`, {
-      method: "DELETE",
-      headers: { "Content-Type": "application/json" },
-    });
-    if (!response.ok) {
-      const error = await response.text();
-      throw new Error(error || `Erro ${response.status}`);
-    }
+    await this.delete(`gestor/emprestimos/${emprestimoId}/`);
     return true;
   }
 }

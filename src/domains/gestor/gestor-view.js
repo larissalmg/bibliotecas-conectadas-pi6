@@ -7,6 +7,7 @@ import {
   validateUnidadeFormData,
 } from "../../utils/form-validation.js";
 import { showToast } from "../../utils/feedback.js";
+import { escapeHtml } from "../../utils/html.js";
 
 export class GestorView {
   showLoading(message = "Carregando...") {
@@ -42,6 +43,16 @@ export class GestorView {
     // Exemplo: renderizar lista de gestores no console
     console.log("Lista de Gestores:", gestores);
     // Aqui você pode implementar a renderização no DOM
+  }
+
+  renderDashboard(data = {}) {
+    this.hideLoading();
+    const root = document.querySelector("#app-content");
+    if (!root) return;
+
+    root.innerHTML = `<dashboard-page></dashboard-page>`;
+    const dashboard = root.querySelector("dashboard-page");
+    dashboard.data = data;
   }
 
   renderLivrosPage(livros, onAdd, onEdit, onDelete, onView, onEditExemplares, onEmprestar = null, onFilter = null, initData = {}) {
@@ -126,7 +137,7 @@ export class GestorView {
           <select id="genero" name="genero" required>
             <option value="">Selecione o gênero</option>
             ${generos
-              .map((g) => `<option value="${g.id}">${g.nome}</option>`)
+              .map((g) => `<option value="${g.id}">${escapeHtml(g.nome)}</option>`)
               .join("")}
           </select>
         `;
@@ -142,7 +153,7 @@ export class GestorView {
         <select id="genero" name="genero" required>
           <option value="">Selecione o gênero</option>
           ${generos
-            .map((g) => `<option value="${g.id}">${g.nome}</option>`)
+            .map((g) => `<option value="${g.id}">${escapeHtml(g.nome)}</option>`)
             .join("")}
         </select>
       `;
@@ -170,7 +181,7 @@ export class GestorView {
           <select id="tipo_obra" name="tipo_obra">
             <option value="">Selecione o tipo de obra</option>
             ${tipo_obras
-              .map((t) => `<option value="${t.id}">${t.nome}</option>`)
+              .map((t) => `<option value="${t.id}">${escapeHtml(t.nome)}</option>`)
               .join("")}
           </select>
         `;
@@ -205,7 +216,12 @@ export class GestorView {
         idioma: livroFormEl.querySelector('input[name="idioma"]')?.value || livroFormEl.idioma?.value,
         genero: livroFormEl.querySelector('select[name="genero"]')?.value,
         tipo_obra: livroFormEl.querySelector('select[name="tipo_obra"]')?.value,
-        unidades: livroFormEl._unidadesSelecionadas || [] 
+        unidades:
+          livroFormEl._unidadesPayload ||
+          (livroFormEl._livroUnidades || []).map((u) => ({
+            unidade: typeof u.unidade === "object" ? u.unidade.id : u.unidade,
+            exemplares: Number(u.exemplares) || 0,
+          }))
       };
 
       const validation = validateLivroFormData(formData);
@@ -240,7 +256,7 @@ export class GestorView {
     }
   }
 
-  renderUnidadeForm(onSubmit, unidade = null, onBack = null) {
+  renderUnidadeForm(onSubmit, unidade = null, onBack = null, bairros = []) {
     this.hideLoading();
     document.querySelector("#app-content").innerHTML = /* html */ `
       <div class="form-container">
@@ -252,12 +268,16 @@ export class GestorView {
       const form = document.querySelector("#unidade-form") || document.querySelector("unidade-form");
       if (!form) return;
 
+      form.bairros = bairros;
+
       if (unidade) {
         if(form.nome) form.nome.value = unidade.nome;
         if(form.endereco) form.endereco.value = unidade.endereco;
         if(form.telefone) form.telefone.value = unidade.telefone || "";
         if(form.email) form.email.value = unidade.email || "";
         if(form.site) form.site.value = unidade.site || "";
+        const bairroSelect = form.querySelector('select[name="ibge_bairro_codigo"]');
+        if (bairroSelect) bairroSelect.value = unidade.ibge_bairro_codigo || "";
       }
 
       form.addEventListener("submit", (event) => {
@@ -278,7 +298,9 @@ export class GestorView {
           endereco: form.querySelector('input[name="endereco"]')?.value || form.endereco?.value,
           telefone: form.querySelector('input[name="telefone"]')?.value || form.telefone?.value,
           email: form.querySelector('input[name="email"]')?.value || form.email?.value,
-          site: form.querySelector('input[name="site"]')?.value || form.site?.value
+          site: form.querySelector('input[name="site"]')?.value || form.site?.value,
+          ibge_bairro_codigo:
+            form.querySelector('select[name="ibge_bairro_codigo"]')?.value || ""
         };
 
         const validation = validateUnidadeFormData(formData);
@@ -390,35 +412,45 @@ export class GestorView {
     emprestimoForm.onBack = onBack;
   }
 
-  renderLivroDetalhe(livro) {
+  renderLivroDetalhe(livro, initData = {}) {
     this.hideLoading();
+
+    const unidades = Array.isArray(livro?.unidades_detalhe)
+      ? livro.unidades_detalhe
+      : Array.isArray(livro?.unidades)
+        ? livro.unidades
+        : [];
+
+    const generoNome =
+      (initData.generos || []).find((g) => Number(g.id) === Number(livro?.genero))?.nome ||
+      "-";
+    const tipoObraNome =
+      (initData.tipo_obras || []).find((t) => Number(t.id) === Number(livro?.tipo_obra))?.nome ||
+      "-";
+
     document.querySelector("#app-content").innerHTML = `
       <div class="livro-detalhe-container">
         <h2><button type="button" id="voltar-btn" class="outline border-0"><i class="fa-solid fa-arrow-left"></i></button> Detalhes do Livro</h2>
         <div>
-          <div><b>Título:</b> ${livro.titulo}</div>
-          <div><b>Autor:</b> ${livro.autor}</div>
-          <div><b>Editora:</b> ${livro.editora || "-"}</div>
-          <div><b>Data de Publicação:</b> ${livro.data_publicacao || "-"}</div>
-          <div><b>ISBN:</b> ${livro.isbn || "-"}</div>
-          <div><b>Páginas:</b> ${livro.paginas || "-"}</div>
-          <div><b>Idioma:</b> ${livro.idioma || "-"}</div>
-          <div><b>Gênero:</b> ${
-            livro.generoObj && livro.generoObj.nome ? livro.generoObj.nome : "-"
-          }</div>
-          <div><b>Tipo de Obra:</b> ${
-            livro.tipo_obraObj && livro.tipo_obraObj.nome ? livro.tipo_obraObj.nome : "-"
-          }</div>
+          <div><b>Título:</b> ${escapeHtml(livro.titulo)}</div>
+          <div><b>Autor:</b> ${escapeHtml(livro.autor)}</div>
+          <div><b>Editora:</b> ${escapeHtml(livro.editora || "-")}</div>
+          <div><b>Data de Publicação:</b> ${escapeHtml(livro.data_publicacao || "-")}</div>
+          <div><b>ISBN:</b> ${escapeHtml(livro.isbn || "-")}</div>
+          <div><b>Páginas:</b> ${escapeHtml(livro.paginas || "-")}</div>
+          <div><b>Idioma:</b> ${escapeHtml(livro.idioma || "-")}</div>
+          <div><b>Gênero:</b> ${escapeHtml(generoNome)}</div>
+          <div><b>Tipo de Obra:</b> ${escapeHtml(tipoObraNome)}</div>
         </div>
         <hr/>
         <h6>Unidades</h6>
         <ul>
           ${
-            (livro.unidades || [])
-              .map(
-                (u) =>
-                  `<li><strong>${u.unidade.nome}:</strong> ${u.exemplares} exemplar(es)</li>`
-              )
+            unidades
+              .map((u) => {
+                const unidade = u.unidade || {};
+                return `<li><strong>${escapeHtml(unidade.nome || "Unidade")}:</strong> ${Number(u.exemplares) || 0} exemplar(es)</li>`;
+              })
               .join("") || "<li>Nenhuma unidade cadastrada.</li>"
           }
         </ul>
@@ -434,12 +466,17 @@ export class GestorView {
       <div class="form-container">
         <div class="unidade-detalhe-header">
           <button id="voltar-unidade-detalhe" class="outline border-0"><i class="fa-solid fa-arrow-left"></i></button>
-          <h2>${unidade.nome}</h2>
+          <h2>${escapeHtml(unidade.nome)}</h2>
         </div>
-        <p><strong>Endereço:</strong> ${unidade.endereco}</p>
-        <p><strong>Telefone:</strong> ${unidade.telefone || "-"}</p>
-        <p><strong>Email:</strong> ${unidade.email || "-"}</p>
-        <p><strong>Site:</strong> ${unidade.site || "-"}</p>
+        <p><strong>Endereço:</strong> ${escapeHtml(unidade.endereco || "")}</p>
+        <p><strong>Telefone:</strong> ${escapeHtml(unidade.telefone || "-")}</p>
+        <p><strong>Email:</strong> ${escapeHtml(unidade.email || "-")}</p>
+        <p><strong>Site:</strong> ${escapeHtml(unidade.site || "-")}</p>
+        <p><strong>Bairro IBGE:</strong> ${escapeHtml(
+          unidade.ibge_bairro_nome ||
+            unidade.ibge_bairro_codigo ||
+            "Não informado"
+        )}</p>
       </div>
     `;
     document.getElementById("voltar-unidade-detalhe").onclick = () =>
@@ -492,7 +529,7 @@ export class GestorView {
           (u) => `
         <div class="exemplares-unidade">
           <input id="exemplares-unidade-${u.unidade.id}" type="number" min="0" value="${u.exemplares}" data-id="${u.unidade.id}">
-          <label for="exemplares-unidade-${u.unidade.id}">${u.unidade.nome}</label>
+          <label for="exemplares-unidade-${u.unidade.id}">${escapeHtml(u.unidade.nome)}</label>
         </div>
       `
         )

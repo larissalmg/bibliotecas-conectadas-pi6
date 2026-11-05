@@ -1,8 +1,8 @@
 export async function authRoutes({ authController, authView, navigate }) {
   const path = window.location.pathname;
 
-  // Só cuida da rota /login. Se não for, não mexe no DOM.
-  if (path !== "/login") return false;
+  // Rotas de autenticação e conta.
+  if (!["/login", "/alterar-senha"].includes(path)) return false;
 
   // Limpa o shell atual apenas quando for /login
   function clearHeader() {
@@ -33,16 +33,19 @@ export async function authRoutes({ authController, authView, navigate }) {
         try {
           // garante chamada assíncrona; ajuste se seu login retornar boolean/throw
           await authController.login(username, password);
-          navigate("/livros"); // só após sucesso
+          navigate("/dashboard"); // só após sucesso
         } catch (err) {
           console.error("Falha no login:", err);
-          // Se seu authView tiver método para mostrar erro, use-o:
+          authView.setLoading?.(false);
+
+          const message =
+            err?.message ||
+            "Não foi possível entrar. Revise usuário/senha e tente novamente.";
+
           if (typeof authView.showError === "function") {
-            authView.showError(
-              "Não foi possível entrar. Revise usuário/senha e tente novamente."
-            );
+            authView.showError(message);
           } else {
-            alert("Não foi possível entrar. Revise usuário/senha e tente novamente.");
+            alert(message);
           }
         } finally {
           authView.setLoading?.(false);
@@ -50,6 +53,19 @@ export async function authRoutes({ authController, authView, navigate }) {
       });
 
       return true;
+
+    case "/alterar-senha":
+      document.body.insertAdjacentHTML(
+        "afterbegin",
+        `<main><app-header></app-header><div id="app-content" class="app-content"></div></main>`
+      );
+      authView.renderChangePassword(
+        (currentPassword, newPassword) =>
+          authController.changePassword(currentPassword, newPassword),
+        () => navigate("/livros")
+      );
+      return true;
+
     default:
       return false;
   }

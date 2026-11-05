@@ -49,10 +49,14 @@ export class BaseService {
   }
 
   async request(endpoint, { method = "GET", body, headers = {}, timeoutMs } = {}) {
-    // Inclui token JWT de autenticação se disponível
+    const url = this.buildUrl(endpoint);
+    const isLoginRequest = /\/gestor\/auth\/login\/?$/i.test(url);
+
     const token =
-      (typeof localStorage !== "undefined" && localStorage.getItem("authToken")) ||
-      null;
+      !isLoginRequest &&
+      typeof localStorage !== "undefined"
+        ? localStorage.getItem("authToken")
+        : null;
 
     const finalHeaders = {
       "Content-Type": "application/json",
@@ -60,10 +64,8 @@ export class BaseService {
     };
 
     if (token) {
-      finalHeaders["Authorization"] = `Bearer ${token}`;
+      finalHeaders["Authorization"] = `Token ${token}`;
     }
-
-    const url = this.buildUrl(endpoint);
 
     let lastErr;
     for (let attempt = 0; attempt <= this.maxRetries; attempt++) {
@@ -83,9 +85,10 @@ export class BaseService {
 
         clearTimeout(timerId);
 
-        // Tratamento de autenticação inválida ou expirada
-        if (res.status === 401) {
-          console.warn("Token inválido ou expirado - redirecionando para login");
+        // Em chamadas autenticadas, 401 encerra a sessão local.
+        // No endpoint de login, deixa o tratamento normal extrair a mensagem da API.
+        if (res.status === 401 && !isLoginRequest) {
+          console.warn("Token inválido - redirecionando para login");
           localStorage.removeItem("authToken");
           localStorage.removeItem("isAuthenticated");
           localStorage.removeItem("user");
@@ -94,7 +97,7 @@ export class BaseService {
             window.navigate("/login");
           }
 
-          throw new Error("Sessão expirada. Faça login novamente.");
+          throw new Error("Sessão inválida. Faça login novamente.");
         }
 
         if (res.status === 204) return {};
@@ -109,11 +112,27 @@ export class BaseService {
           }
           let detail = raw || res.statusText || "Erro HTTP";
 
-          if (raw && contentType.includes("application/json")) {
+          const looksLikeHtml =
+            contentType.includes("text/html") ||
+            /^\s*<!doctype html/i.test(raw) ||
+            /^\s*<html/i.test(raw);
+
+          if (res.status >= 500 && looksLikeHtml) {
+            detail =
+              "O servidor encontrou um erro interno. Tente novamente em instantes.";
+          } else if (raw && contentType.includes("application/json")) {
             try {
               const parsed = JSON.parse(raw);
               if (typeof parsed?.detail === "string" && parsed.detail.trim()) {
                 detail = parsed.detail.trim();
+              } else if (parsed && typeof parsed === "object") {
+                const firstValue = Object.values(parsed)[0];
+                const firstMessage = Array.isArray(firstValue)
+                  ? firstValue[0]
+                  : firstValue;
+                if (typeof firstMessage === "string" && firstMessage.trim()) {
+                  detail = firstMessage.trim();
+                }
               }
             } catch {
               // Mantém o texto bruto quando a resposta não puder ser parseada.
