@@ -1,0 +1,645 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Painel de Gestão do Acervo</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+:root {
+  color-scheme: light;
+  --surface-0: #f4f6f7;
+  --surface-1: #ffffff;
+  --border:    #dfe4e6;
+  --ink-1:     #11201f;
+  --ink-2:     #4f6462;
+  --ink-3:     #7d908e;
+  --brand:     #0f9b9b;
+  --brand-ink: #0a6f6f;
+  --accent:    #e4699b;
+
+  --series-1:  #1baf7a;
+  --series-2:  #2a78d6;
+  --series-3:  #eb6834;
+  --series-4:  #6250d6;
+
+  --good:      #008300;
+  --warn:      #eb6834;
+
+  --radius: 12px;
+  --shadow: 0 1px 2px rgba(17,32,31,.06), 0 4px 16px rgba(17,32,31,.05);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --surface-0: #12191a;
+    --surface-1: #1b2426;
+    --border:    #2d3a3c;
+    --ink-1:     #eef3f2;
+    --ink-2:     #b3c2c0;
+    --ink-3:     #869997;
+    --brand:     #2bbcbc;
+    --brand-ink: #4fd2d2;
+    --series-1:  #199e70;
+    --series-2:  #3987e5;
+    --series-3:  #d95926;
+    --series-4:  #9085e9;
+    --shadow: 0 1px 2px rgba(0,0,0,.3), 0 4px 16px rgba(0,0,0,.25);
+  }
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font-family: Inter, system-ui, -apple-system, "Segoe UI", sans-serif;
+  background: var(--surface-0);
+  color: var(--ink-1);
+  -webkit-font-smoothing: antialiased;
+}
+
+.wrap { max-width: 1180px; margin: 0 auto; padding: 0 16px 64px; }
+
+/* ---------- cabeçalho ---------- */
+header.top {
+  background: var(--surface-1);
+  border-bottom: 1px solid var(--border);
+  padding: 20px 0;
+  margin-bottom: 28px;
+}
+header.top .wrap { padding-bottom: 0; }
+.eyebrow {
+  font-size: 12px; font-weight: 600; letter-spacing: .09em;
+  text-transform: uppercase; color: var(--brand-ink); margin: 0 0 6px;
+}
+h1 { font-size: 27px; font-weight: 700; margin: 0 0 8px; letter-spacing: -.02em; }
+.lede { margin: 0; color: var(--ink-2); font-size: 15px; max-width: 70ch; line-height: 1.5; }
+
+/* ---------- login ---------- */
+.login-shell {
+  min-height: 78vh; display: grid; place-items: center; padding: 24px;
+}
+.login-card {
+  background: var(--surface-1); border: 1px solid var(--border);
+  border-radius: var(--radius); box-shadow: var(--shadow);
+  padding: 32px; width: 100%; max-width: 380px;
+}
+.login-card h2 { margin: 0 0 4px; font-size: 20px; }
+.login-card p.sub { margin: 0 0 24px; color: var(--ink-2); font-size: 14px; }
+label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 6px; color: var(--ink-2); }
+input, select {
+  width: 100%; padding: 10px 12px; font: inherit; font-size: 14px;
+  border: 1px solid var(--border); border-radius: 8px;
+  background: var(--surface-1); color: var(--ink-1); margin-bottom: 16px;
+}
+input:focus, select:focus { outline: 2px solid var(--brand); outline-offset: 1px; border-color: transparent; }
+button.primary {
+  width: 100%; padding: 11px; font: inherit; font-size: 15px; font-weight: 600;
+  background: var(--brand); color: #fff; border: 0; border-radius: 8px; cursor: pointer;
+}
+button.primary:hover { background: var(--brand-ink); }
+button.primary:disabled { opacity: .6; cursor: progress; }
+.erro {
+  background: #fdecec; border: 1px solid #f5c2c2; color: #8a1f1f;
+  padding: 10px 12px; border-radius: 8px; font-size: 13px; margin-bottom: 16px;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .erro { background: #3a1f1f; border-color: #5e2e2e; color: #f3c9c9; }
+}
+
+/* ---------- filtros ---------- */
+.filtros {
+  display: flex; flex-wrap: wrap; gap: 14px; align-items: flex-end;
+  background: var(--surface-1); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 16px 18px; margin-bottom: 24px;
+}
+.filtros .campo { flex: 1 1 190px; }
+.filtros input, .filtros select { margin-bottom: 0; }
+.filtros button {
+  padding: 10px 18px; font: inherit; font-size: 14px; font-weight: 600;
+  border-radius: 8px; border: 1px solid var(--border); cursor: pointer;
+  background: var(--surface-1); color: var(--ink-1);
+}
+.filtros button.aplicar { background: var(--brand); color: #fff; border-color: var(--brand); }
+
+/* ---------- cards ---------- */
+.cards {
+  display: grid; gap: 14px; margin-bottom: 28px;
+  grid-template-columns: repeat(auto-fit, minmax(165px, 1fr));
+}
+.card {
+  background: var(--surface-1); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 18px 20px; box-shadow: var(--shadow);
+}
+.card .rot { font-size: 12.5px; color: var(--ink-2); font-weight: 500; margin-bottom: 6px; }
+.card .num { font-size: 30px; font-weight: 700; letter-spacing: -.02em; line-height: 1.1; }
+.card .pe { font-size: 12px; color: var(--ink-3); margin-top: 4px; }
+
+/* ---------- seções ---------- */
+section { margin-bottom: 32px; }
+h2.sec {
+  font-size: 19px; font-weight: 700; margin: 0 0 4px; letter-spacing: -.01em;
+}
+p.sec-sub { margin: 0 0 16px; color: var(--ink-2); font-size: 14px; line-height: 1.5; }
+
+.grid-2 { display: grid; gap: 18px; grid-template-columns: repeat(auto-fit, minmax(330px, 1fr)); }
+
+.painel {
+  background: var(--surface-1); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 20px; box-shadow: var(--shadow);
+}
+.painel h3 { margin: 0 0 2px; font-size: 15px; font-weight: 600; }
+.painel .nota { margin: 0 0 14px; font-size: 12.5px; color: var(--ink-3); }
+.chart-box { position: relative; height: 270px; }
+.chart-box.alta { height: 330px; }
+
+/* ---------- qualidade ---------- */
+.qualidade { border-left: 3px solid var(--brand); }
+.medidor { display: flex; align-items: baseline; gap: 10px; margin-bottom: 4px; }
+.medidor .v { font-size: 38px; font-weight: 700; letter-spacing: -.02em; color: var(--brand-ink); }
+.medidor .u { font-size: 14px; color: var(--ink-2); }
+.barra-fundo { height: 8px; background: var(--surface-0); border-radius: 4px; overflow: hidden; margin: 12px 0 6px; }
+.barra-fundo > div { height: 100%; background: var(--brand); border-radius: 4px; }
+
+table.lac { width: 100%; border-collapse: collapse; font-size: 14px; margin-top: 6px; }
+table.lac th {
+  text-align: left; font-size: 12px; text-transform: uppercase; letter-spacing: .05em;
+  color: var(--ink-3); font-weight: 600; padding: 8px 0; border-bottom: 1px solid var(--border);
+}
+table.lac td { padding: 9px 0; border-bottom: 1px solid var(--border); }
+table.lac td:last-child, table.lac th:last-child { text-align: right; }
+table.lac tr:last-child td { border-bottom: 0; }
+.pil {
+  display: inline-flex; align-items: center; gap: 5px;
+  font-size: 12px; font-weight: 600; padding: 3px 9px; border-radius: 999px;
+}
+.pil.ok { background: #e3f3e3; color: #15600f; }
+.pil.at { background: #fdeee4; color: #9c3f10; }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .pil.ok { background: #1c3a1c; color: #9ad99a; }
+  :root:not([data-theme="light"]) .pil.at { background: #3d2718; color: #f0b088; }
+}
+
+.insight {
+  display: flex; gap: 12px; padding: 14px 0; border-bottom: 1px solid var(--border);
+}
+.insight:last-child { border-bottom: 0; }
+.insight .ic {
+  flex: 0 0 32px; height: 32px; border-radius: 8px; display: grid; place-items: center;
+  font-size: 15px; background: var(--surface-0);
+}
+.insight .tx strong { display: block; font-size: 14px; margin-bottom: 2px; }
+.insight .tx span { font-size: 13px; color: var(--ink-2); line-height: 1.45; }
+
+.rodape {
+  margin-top: 36px; padding-top: 18px; border-top: 1px solid var(--border);
+  font-size: 12.5px; color: var(--ink-3); line-height: 1.6;
+}
+.carregando { text-align: center; padding: 60px 0; color: var(--ink-2); }
+.vazio { padding: 28px 0; text-align: center; color: var(--ink-3); font-size: 14px; }
+.oculto { display: none !important; }
+</style>
+</head>
+<body>
+
+<!-- ================= LOGIN ================= -->
+<div id="telaLogin" class="login-shell">
+  <form class="login-card" id="formLogin">
+    <h2>Painel de Gestão do Acervo</h2>
+    <p class="sub">Projeto Integrador VI — Bibliotecas Conectadas</p>
+    <div id="erroLogin" class="erro oculto"></div>
+    <label for="usuario">Usuário</label>
+    <input id="usuario" autocomplete="username" required>
+    <label for="senha">Senha</label>
+    <input id="senha" type="password" autocomplete="current-password" required>
+    <button class="primary" id="btnEntrar" type="submit">Entrar</button>
+  </form>
+</div>
+
+<!-- ================= PAINEL ================= -->
+<div id="telaPainel" class="oculto">
+
+  <header class="top">
+    <div class="wrap">
+      <p class="eyebrow">Projeto Integrador VI · Bibliotecas Conectadas</p>
+      <h1>Painel de Gestão do Acervo</h1>
+      <p class="lede">
+        Indicadores de composição, distribuição e qualidade do cadastro das bibliotecas
+        públicas municipais de Santos. Nenhum dado pessoal de leitor é utilizado.
+      </p>
+    </div>
+  </header>
+
+  <div class="wrap">
+
+    <!-- filtros -->
+    <div class="filtros">
+      <div class="campo">
+        <label for="fUnidade">Biblioteca</label>
+        <select id="fUnidade"><option value="">Todas as unidades</option></select>
+      </div>
+      <div class="campo">
+        <label for="fCategoria">Categoria</label>
+        <select id="fCategoria"><option value="">Todas as categorias</option></select>
+      </div>
+      <div class="campo">
+        <label for="fAnoIni">Publicação de</label>
+        <input id="fAnoIni" type="number" placeholder="ano inicial">
+      </div>
+      <div class="campo">
+        <label for="fAnoFim">até</label>
+        <input id="fAnoFim" type="number" placeholder="ano final">
+      </div>
+      <button class="aplicar" id="btnAplicar">Aplicar</button>
+      <button id="btnLimpar">Limpar</button>
+    </div>
+
+    <div id="carregando" class="carregando">Carregando indicadores…</div>
+
+    <div id="conteudo" class="oculto">
+
+      <!-- cards -->
+      <div class="cards" id="cards"></div>
+
+      <!-- QUALIDADE DO CADASTRO -->
+      <section>
+        <h2 class="sec">Qualidade e completude do cadastro</h2>
+        <p class="sec-sub">
+          Avalia seis campos por título: autor, categoria, data de publicação, ISBN,
+          imagem de capa e vínculo com unidade. Campos preenchidos apenas com espaços
+          são considerados ausentes.
+        </p>
+        <div class="grid-2">
+          <div class="painel qualidade">
+            <h3>Completude geral</h3>
+            <p class="nota">Percentual de campos preenchidos no conjunto do acervo</p>
+            <div class="medidor">
+              <span class="v" id="qPct">—</span>
+              <span class="u">dos campos avaliados</span>
+            </div>
+            <div class="barra-fundo"><div id="qBarra" style="width:0%"></div></div>
+            <p class="nota" id="qBase"></p>
+            <table class="lac">
+              <thead><tr><th>Campo ausente</th><th>Títulos</th><th>Situação</th></tr></thead>
+              <tbody id="qTabela"></tbody>
+            </table>
+          </div>
+          <div class="painel">
+            <h3>Títulos com campo ausente</h3>
+            <p class="nota">Quanto menor a barra, melhor o preenchimento</p>
+            <div class="chart-box"><canvas id="cQualidade"></canvas></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- COMPOSIÇÃO -->
+      <section>
+        <h2 class="sec">Composição do acervo</h2>
+        <p class="sec-sub">Distribuição dos títulos por categoria temática e por unidade.</p>
+        <div class="grid-2">
+          <div class="painel">
+            <h3>Acervo por categoria</h3>
+            <p class="nota">Dez categorias com mais títulos</p>
+            <div class="chart-box alta"><canvas id="cCategoria"></canvas></div>
+          </div>
+          <div class="painel">
+            <h3>Acervo por unidade</h3>
+            <p class="nota">Títulos e exemplares em cada biblioteca</p>
+            <div class="chart-box alta"><canvas id="cUnidade"></canvas></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- PERFIL -->
+      <section>
+        <h2 class="sec">Perfil do acervo</h2>
+        <p class="sec-sub">Autoria e distribuição temporal das obras cadastradas.</p>
+        <div class="grid-2">
+          <div class="painel">
+            <h3>Autores com mais títulos</h3>
+            <p class="nota">Até dez autores</p>
+            <div class="chart-box alta"><canvas id="cAutores"></canvas></div>
+          </div>
+          <div class="painel">
+            <h3>Publicações por década</h3>
+            <p class="nota">Pela data de publicação informada</p>
+            <div class="chart-box alta"><canvas id="cDecada"></canvas></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- INSIGHTS -->
+      <section>
+        <h2 class="sec">Leitura dos indicadores</h2>
+        <p class="sec-sub">Observações derivadas dos dados acima.</p>
+        <div class="painel" id="insights"></div>
+      </section>
+
+      <p class="rodape" id="rodape"></p>
+    </div>
+  </div>
+</div>
+
+<script type="module">
+/* =====================================================================
+   Painel de Gestão do Acervo — PI VI
+   Consome /gestor/analytics/gestao-livros/ e .../filtros/
+   ===================================================================== */
+
+const API = (import.meta.env && import.meta.env.VITE_API_URL) || "http://localhost:8000";
+let TOKEN = null;
+const graficos = {};
+
+/* ---------- utilidades ---------- */
+const $ = (id) => document.getElementById(id);
+const n = (v) => (v === null || v === undefined ? "—" : Number(v).toLocaleString("pt-BR"));
+
+function css(nome) {
+  return getComputedStyle(document.documentElement).getPropertyValue(nome).trim();
+}
+
+async function api(caminho) {
+  const r = await fetch(API + caminho, {
+    headers: { "Authorization": "Token " + TOKEN, "Accept": "application/json" }
+  });
+  if (!r.ok) throw new Error("HTTP " + r.status + " em " + caminho);
+  return r.json();
+}
+
+/* ---------- login ---------- */
+$("formLogin").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const btn = $("btnEntrar");
+  const erro = $("erroLogin");
+  erro.classList.add("oculto");
+  btn.disabled = true;
+  btn.textContent = "Entrando…";
+
+  try {
+    const r = await fetch(API + "/gestor/auth/login/", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ username: $("usuario").value, password: $("senha").value })
+    });
+    const dados = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(dados.detail || "Usuário ou senha inválidos.");
+
+    TOKEN = dados.token || dados.key || dados.auth_token || (dados.data && dados.data.token);
+    if (!TOKEN) throw new Error("A resposta do servidor não trouxe o token de acesso.");
+
+    $("telaLogin").classList.add("oculto");
+    $("telaPainel").classList.remove("oculto");
+    await iniciar();
+  } catch (err) {
+    erro.textContent = err.message;
+    erro.classList.remove("oculto");
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "Entrar";
+  }
+});
+
+/* ---------- carga inicial ---------- */
+async function iniciar() {
+  try {
+    const f = await api("/gestor/analytics/gestao-livros/filtros/");
+    (f.unidades || []).forEach(u => {
+      const o = document.createElement("option");
+      o.value = u.id; o.textContent = u.nome; $("fUnidade").appendChild(o);
+    });
+    (f.categorias || []).forEach(c => {
+      const o = document.createElement("option");
+      o.value = c.id; o.textContent = c.nome; $("fCategoria").appendChild(o);
+    });
+    if (f.anos_publicacao) {
+      $("fAnoIni").placeholder = f.anos_publicacao.inicio ?? "ano inicial";
+      $("fAnoFim").placeholder = f.anos_publicacao.fim ?? "ano final";
+    }
+  } catch (e) {
+    console.warn("Filtros indisponíveis:", e.message);
+  }
+  await carregar();
+}
+
+$("btnAplicar").addEventListener("click", carregar);
+$("btnLimpar").addEventListener("click", () => {
+  $("fUnidade").value = ""; $("fCategoria").value = "";
+  $("fAnoIni").value = ""; $("fAnoFim").value = "";
+  carregar();
+});
+
+async function carregar() {
+  $("carregando").classList.remove("oculto");
+  $("conteudo").classList.add("oculto");
+
+  const p = new URLSearchParams();
+  if ($("fUnidade").value)   p.set("unidade_id", $("fUnidade").value);
+  if ($("fCategoria").value) p.set("genero_id", $("fCategoria").value);
+  if ($("fAnoIni").value)    p.set("ano_inicio", $("fAnoIni").value);
+  if ($("fAnoFim").value)    p.set("ano_fim", $("fAnoFim").value);
+  const qs = p.toString() ? "?" + p.toString() : "";
+
+  try {
+    const d = await api("/gestor/analytics/gestao-livros/" + qs);
+    render(d);
+    $("carregando").classList.add("oculto");
+    $("conteudo").classList.remove("oculto");
+  } catch (e) {
+    $("carregando").textContent = "Não foi possível carregar os indicadores: " + e.message;
+  }
+}
+
+/* ---------- base dos gráficos ---------- */
+function baseOpts(horizontal) {
+  const tinta2 = css("--ink-2"), tinta3 = css("--ink-3"), borda = css("--border");
+  return {
+    indexAxis: horizontal ? "y" : "x",
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        backgroundColor: css("--ink-1"),
+        padding: 10, cornerRadius: 6, displayColors: false,
+        titleFont: { family: "Inter", size: 13, weight: "600" },
+        bodyFont: { family: "Inter", size: 12.5 }
+      }
+    },
+    scales: {
+      x: {
+        grid: { display: horizontal, color: borda, drawTicks: false },
+        border: { display: false },
+        ticks: { color: tinta3, font: { family: "Inter", size: 11.5 } }
+      },
+      y: {
+        grid: { display: !horizontal, color: borda, drawTicks: false },
+        border: { display: false },
+        ticks: { color: tinta2, font: { family: "Inter", size: 11.5 } }
+      }
+    }
+  };
+}
+
+function barra(id, rotulos, valores, cor, horizontal, nomeSerie) {
+  if (graficos[id]) graficos[id].destroy();
+  graficos[id] = new Chart($(id), {
+    type: "bar",
+    data: {
+      labels: rotulos,
+      datasets: [{
+        label: nomeSerie || "",
+        data: valores,
+        backgroundColor: cor,
+        borderRadius: 4,
+        borderSkipped: false,
+        maxBarThickness: horizontal ? 18 : 42
+      }]
+    },
+    options: baseOpts(horizontal)
+  });
+}
+
+/* ---------- renderização ---------- */
+function render(d) {
+  const ind = d.indicadores || {};
+  const sit = d.situacao_exemplares || {};
+  const q   = d.qualidade_acervo || {};
+
+  /* cards */
+  const cards = [
+    ["Títulos",            ind.titulos,            "obras distintas no catálogo"],
+    ["Exemplares",         ind.exemplares,         "unidades físicas cadastradas"],
+    ["Autores",            ind.autores_distintos,  "autores distintos"],
+    ["Categorias",         ind.categorias,         "gêneros representados"],
+    ["Bibliotecas",        ind.unidades_com_acervo, "unidades com acervo"],
+    ["Exemplares disponíveis", sit.disponiveis,    "não emprestados no momento"]
+  ];
+  $("cards").innerHTML = cards.map(([r, v, p]) => `
+    <div class="card">
+      <div class="rot">${r}</div>
+      <div class="num">${n(v)}</div>
+      <div class="pe">${p}</div>
+    </div>`).join("");
+
+  /* qualidade */
+  const pct = q.percentual_campos_preenchidos;
+  $("qPct").textContent = pct !== undefined && pct !== null ? String(pct).replace(".", ",") + "%" : "—";
+  $("qBarra").style.width = (pct || 0) + "%";
+  $("qBase").textContent =
+    `Base: ${n(q.titulos_total)} títulos × ${n(q.campos_avaliados_por_titulo)} campos avaliados.`;
+
+  const lacunas = [
+    ["Sem autor",               q.titulos_sem_autor],
+    ["Sem categoria",           q.titulos_sem_categoria],
+    ["Sem data de publicação",  q.titulos_sem_data_publicacao],
+    ["Sem ISBN",                q.titulos_sem_isbn],
+    ["Sem imagem de capa",      q.titulos_sem_capa],
+    ["Sem vínculo com unidade", q.titulos_sem_unidade]
+  ];
+
+  $("qTabela").innerHTML = lacunas.map(([rot, v]) => {
+    const zero = !v;
+    return `<tr>
+      <td>${rot}</td>
+      <td style="text-align:right;font-variant-numeric:tabular-nums">${n(v)}</td>
+      <td><span class="pil ${zero ? "ok" : "at"}">${zero ? "completo" : "atenção"}</span></td>
+    </tr>`;
+  }).join("");
+
+  barra("cQualidade",
+    lacunas.map(l => l[0].replace("Sem ", "")),
+    lacunas.map(l => l[1] || 0),
+    css("--series-3"), true);
+
+  /* composição */
+  const cat = (d.acervo_por_categoria || [])
+    .slice().sort((a, b) => b.titulos - a.titulos).slice(0, 10);
+  if (cat.length) {
+    barra("cCategoria", cat.map(c => c.categoria), cat.map(c => c.titulos),
+          css("--series-1"), true);
+  }
+
+  const uni = d.acervo_por_unidade || [];
+  if (uni.length) {
+    if (graficos.cUnidade) graficos.cUnidade.destroy();
+    const o = baseOpts(false);
+    o.plugins.legend = {
+      display: true, position: "top", align: "start",
+      labels: {
+        boxWidth: 10, boxHeight: 10, usePointStyle: true, pointStyle: "circle",
+        color: css("--ink-2"), font: { family: "Inter", size: 12 }
+      }
+    };
+    graficos.cUnidade = new Chart($("cUnidade"), {
+      type: "bar",
+      data: {
+        labels: uni.map(u => u.unidade.replace(/^Biblioteca\s+(Municipal\s+)?/i, "")),
+        datasets: [
+          { label: "Títulos",    data: uni.map(u => u.titulos),
+            backgroundColor: css("--series-1"), borderRadius: 4, borderSkipped: false, maxBarThickness: 20 },
+          { label: "Exemplares", data: uni.map(u => u.exemplares),
+            backgroundColor: css("--series-2"), borderRadius: 4, borderSkipped: false, maxBarThickness: 20 }
+        ]
+      },
+      options: o
+    });
+  }
+
+  /* perfil */
+  const aut = d.top_autores || [];
+  if (aut.length) {
+    barra("cAutores", aut.map(a => a.autor), aut.map(a => a.titulos),
+          css("--series-4"), true);
+  }
+
+  const dec = d.publicacoes_por_decada || [];
+  if (dec.length) {
+    barra("cDecada", dec.map(x => x.faixa), dec.map(x => x.titulos),
+          css("--series-2"), false);
+  }
+
+  /* insights */
+  const ins = d.insights_acervo || {};
+  const blocos = [];
+
+  if (ins.categoria_mais_representada) {
+    const c = ins.categoria_mais_representada;
+    blocos.push(["▲", "Categoria mais representada",
+      `${c.categoria} reúne ${n(c.titulos)} títulos, ${String(c.participacao_percentual).replace(".", ",")}% do acervo categorizado.`]);
+  }
+  if (ins.categoria_menor_representacao) {
+    const c = ins.categoria_menor_representacao;
+    blocos.push(["▼", "Categoria com menor representação",
+      `${c.categoria} tem ${n(c.titulos)} título(s), ${String(c.participacao_percentual).replace(".", ",")}% do acervo categorizado.`]);
+  }
+
+  const totalLacunas = lacunas.reduce((s, l) => s + (l[1] || 0), 0);
+  blocos.push(["✓", "Completude do cadastro",
+    totalLacunas === 0
+      ? "Todos os campos avaliados estão preenchidos em todos os títulos."
+      : `${n(totalLacunas)} ocorrência(s) de campo ausente distribuídas entre os títulos. O campo com mais lacunas é "${lacunas.slice().sort((a,b)=>(b[1]||0)-(a[1]||0))[0][0].toLowerCase()}".`]);
+
+  if (sit.reservados === null) {
+    blocos.push(["!", "Limitação do modelo de dados",
+      "O sistema não registra reservas, portanto a fila de espera por título não pode ser medida nesta versão."]);
+  }
+
+  $("insights").innerHTML = blocos.map(([ic, t, s]) => `
+    <div class="insight">
+      <div class="ic">${ic}</div>
+      <div class="tx"><strong>${t}</strong><span>${s}</span></div>
+    </div>`).join("");
+
+  /* rodapé */
+  const m = d.meta || {};
+  $("rodape").textContent =
+    (m.observacao || "") +
+    " Indicadores calculados a partir dos dados cadastrados na plataforma Bibliotecas Conectadas.";
+}
+</script>
+</body>
+</html>

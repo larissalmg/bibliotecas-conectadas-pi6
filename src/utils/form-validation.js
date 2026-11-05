@@ -1,3 +1,5 @@
+import { isValidIsbn10, isValidIsbn13, normalizeIsbn } from "./isbn.js";
+
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 function digitsCount(value = "") {
@@ -100,8 +102,13 @@ const livroRules = {
     label: "ISBN",
     required: true,
     maxLength: 13,
-    pattern: /^(?:\d{10}|\d{13}|\d{9}[\dXx])$/,
-    patternMessage: "ISBN deve conter 10 ou 13 caracteres válidos.",
+    customValidate: (value) => {
+      const isbn = normalizeIsbn(value);
+      if (!(isValidIsbn10(isbn) || isValidIsbn13(isbn))) {
+        return "ISBN inválido. Confira os 10 ou 13 dígitos.";
+      }
+      return "";
+    },
   },
   editora: { label: "Editora", maxLength: 255 },
   idioma: { label: "Idioma", maxLength: 50 },
@@ -124,6 +131,11 @@ const unidadeRules = {
   },
   email: { label: "E-mail", type: "email", maxLength: 254 },
   site: { label: "Site", type: "url", maxLength: 200 },
+  ibge_bairro_codigo: {
+    label: "Bairro IBGE",
+    pattern: /^\d{10}$/,
+    patternMessage: "Código de bairro IBGE inválido.",
+  },
 };
 
 const usuarioRules = {
@@ -181,12 +193,18 @@ const usuarioRules = {
 
 export function validateLivroFormData(payload) {
   const cleanData = sanitizePayload(payload);
+  if (cleanData.isbn) {
+    cleanData.isbn = normalizeIsbn(cleanData.isbn);
+  }
   const validation = validatePayload(cleanData, livroRules);
   return { cleanData, ...validation };
 }
 
 export function validateUnidadeFormData(payload) {
   const cleanData = sanitizePayload(payload);
+  if (cleanData.ibge_bairro_codigo === "") {
+    cleanData.ibge_bairro_codigo = null;
+  }
   const validation = validatePayload(cleanData, unidadeRules);
   return { cleanData, ...validation };
 }

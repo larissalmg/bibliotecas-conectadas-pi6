@@ -10,6 +10,8 @@ import "./components/usuario/usuario-list.js";
 import "./components/emprestimo/emprestimo-form.js";
 import "./components/emprestimo/emprestimo-list.js";
 import "./components/app-header.js";
+import "./components/dashboard/dashboard-page.js";
+import "./components/acesso/acesso-page.js";
 import { router as appRouter } from "./routes.js";
 import { GestorController } from "./domains/gestor/gestor-controller.js";
 import { AuthController } from "./domains/auth/auth-controller.js";
@@ -19,6 +21,7 @@ import { GestorView } from "./domains/gestor/gestor-view.js";
 const gestorController = new GestorController();
 window.gestorController = gestorController;
 const authController = new AuthController();
+window.authController = authController;
 const authView = new AuthView();
 const gestorView = new GestorView();
 window.gestorView = gestorView;
@@ -49,29 +52,63 @@ window.addEventListener("popstate", () =>
 
 appRouter({ gestorController, gestorView, authController, authView, navigate });
 
-// Table scroll indicators: add classes when table overflows and on scroll
+// Tabelas responsivas: no desktop permanecem como tabela; no mobile
+// cada linha recebe rótulos para ser apresentada como card sem rolagem horizontal.
+function enhanceResponsiveTables() {
+  document.querySelectorAll(".table-responsive table").forEach((table) => {
+    table.classList.add("mobile-card-table");
+
+    const headers = Array.from(table.querySelectorAll("thead th")).map((th) =>
+      String(th.textContent || "").trim()
+    );
+
+    table.querySelectorAll("tbody tr").forEach((row) => {
+      Array.from(row.children).forEach((cell, index) => {
+        if (cell.tagName !== "TD" || cell.hasAttribute("colspan")) return;
+        cell.dataset.label = headers[index] || "";
+      });
+    });
+  });
+}
+
+// Scroll indicators ficam restritos às telas em que a tabela continua horizontal.
 function updateTableScrollIndicators() {
-  document.querySelectorAll('.table-responsive').forEach((container) => {
+  enhanceResponsiveTables();
+
+  document.querySelectorAll(".table-responsive").forEach((container) => {
     const hasOverflow = container.scrollWidth > container.clientWidth + 1;
-    if (hasOverflow) container.classList.add('is-scrollable');
-    else container.classList.remove('is-scrollable');
+    if (hasOverflow) container.classList.add("is-scrollable");
+    else container.classList.remove("is-scrollable");
 
-    // mark scrolled state for left shadow
-    if (container.scrollLeft > 6) container.classList.add('scrolled');
-    else container.classList.remove('scrolled');
+    if (container.scrollLeft > 6) container.classList.add("scrolled");
+    else container.classList.remove("scrolled");
 
-    // listen to scroll once
     if (!container.__scrollHandlerAttached) {
-      container.addEventListener('scroll', () => {
-        if (container.scrollLeft > 6) container.classList.add('scrolled');
-        else container.classList.remove('scrolled');
+      container.addEventListener("scroll", () => {
+        if (container.scrollLeft > 6) container.classList.add("scrolled");
+        else container.classList.remove("scrolled");
       });
       container.__scrollHandlerAttached = true;
     }
   });
 }
 
-window.addEventListener('resize', () => updateTableScrollIndicators());
-window.addEventListener('DOMContentLoaded', () => updateTableScrollIndicators());
-// run once after initial load
-setTimeout(updateTableScrollIndicators, 120);
+let responsiveTableFrame = null;
+const scheduleResponsiveTableEnhancement = () => {
+  if (responsiveTableFrame) cancelAnimationFrame(responsiveTableFrame);
+  responsiveTableFrame = requestAnimationFrame(() => {
+    responsiveTableFrame = null;
+    updateTableScrollIndicators();
+  });
+};
+
+window.addEventListener("resize", scheduleResponsiveTableEnhancement);
+window.addEventListener("DOMContentLoaded", scheduleResponsiveTableEnhancement);
+
+const tableObserver = new MutationObserver(scheduleResponsiveTableEnhancement);
+tableObserver.observe(document.body, {
+  childList: true,
+  subtree: true,
+});
+
+setTimeout(scheduleResponsiveTableEnhancement, 120);
